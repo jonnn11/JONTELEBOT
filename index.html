@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JONXX BOTT - COMMAND CENTER</title>
+    <style>
+        :root { --primary: #00f2ff; --bg: #0a0a0c; --panel: rgba(16, 18, 23, 0.9); --border: #1f242d; --text: #e0e0e0; }
+        body { background-color: var(--bg); color: var(--text); font-family: 'Courier New', monospace; margin: 0; display: flex; justify-content: center; min-height: 100vh; }
+        body::before { content: ""; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 40px 40px; z-index: -1; opacity: 0.1; }
+        #loader { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg); display: flex; align-items: center; justify-content: center; z-index: 999; font-size: 1.2rem; color: var(--primary); letter-spacing: 5px; animation: fadeOut 1s forwards 1.5s; }
+        @keyframes fadeOut { to { opacity: 0; visibility: hidden; } }
+        .container { width: 100%; max-width: 500px; padding: 40px 20px; animation: slideUp 0.6s ease-out 1.5s both; }
+        @keyframes slideUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+        h1 { font-size: 1.1rem; text-align: center; letter-spacing: 0.4rem; border-bottom: 1px solid var(--border); padding-bottom: 15px; margin-bottom: 25px; color: var(--primary); }
+        .card { background: var(--panel); border: 1px solid var(--border); padding: 20px; margin-bottom: 15px; border-radius: 4px; }
+        #stText { font-weight: bold; }
+        .online-text { color: #00ff88; text-shadow: 0 0 8px #00ff88; }
+        .offline-text { color: #ff4444; }
+        input, textarea { width: 100%; background: #000; border: 1px solid var(--border); color: #fff; padding: 10px; margin-top: 8px; box-sizing: border-box; font-family: inherit; }
+        input:focus { border-color: var(--primary); outline: none; }
+        .slot { border-left: 2px solid var(--primary); background: rgba(255, 255, 255, 0.02); padding: 15px; margin-bottom: 10px; position: relative; }
+        .btn { background: none; border: 1px solid var(--primary); color: var(--primary); padding: 10px; cursor: pointer; width: 100%; text-transform: uppercase; font-size: 0.75rem; transition: 0.3s; margin-top: 10px; }
+        .btn:hover { background: var(--primary); color: #000; box-shadow: 0 0 15px var(--primary); }
+        .btn-stop { border-color: #ff4444; color: #ff4444; }
+        .btn-stop:hover { background: #ff4444; color: #000; box-shadow: 0 0 15px #ff4444; }
+        .btn-del { position: absolute; top: 5px; right: 5px; color: #ff4444; background: none; border: none; cursor: pointer; }
+        label { font-size: 0.65rem; color: #555; text-transform: uppercase; }
+    </style>
+</head>
+<body>
+    <div id="loader">_SYSTEM_BOOTING_</div>
+    <div class="container">
+        <h1>JONXX BOTT</h1>
+        <div class="card">
+            <div style="text-align: center; font-size: 0.7rem; margin-bottom: 15px;">
+                STATUS: <span id="stText" class="offline-text">OFFLINE</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+                <div style="flex: 1;"><label>MIN_DELAY</label><input type="number" id="min" value="10"></div>
+                <div style="flex: 1;"><label>MAX_DELAY</label><input type="number" id="max" value="30"></div>
+            </div>
+            <button class="btn" onclick="start()">EXECUTE START</button>
+            <button class="btn btn-stop" onclick="stop()">ABORT SYSTEM</button>
+        </div>
+        <div id="slots"></div>
+        <button class="btn" style="border-style: dashed; color: #444; border-color: #222;" onclick="addSlot()">+ NEW_SLOT</button>
+        <div class="card" style="margin-top: 30px; border-color: #111;">
+            <label>API_ENDPOINT</label>
+            <input type="text" id="url" value="http://panel.fyxzpedia.biz.id:2151" style="color: #444; font-size: 0.65rem;">
+        </div>
+    </div>
+    <script>
+        const proxy = "https://corsproxy.io/?";
+        function addSlot(d = null) {
+            const id = Date.now();
+            const div = document.createElement('div');
+            div.className = 'slot'; div.id = id;
+            div.innerHTML = `<button class="btn-del" onclick="document.getElementById('${id}').remove()">[X]</button>
+                <label>TARGETS</label><input class="g" placeholder="@user1, @user2" value="${d ? d.groups.join(',') : ''}">
+                <div style="margin-top:10px;"><label>MESSAGE</label><textarea class="m" rows="3">${d ? d.message : ''}</textarea></div>`;
+            document.getElementById('slots').appendChild(div);
+        }
+        async function start() {
+            const url = document.getElementById('url').value;
+            const targets = Array.from(document.querySelectorAll('.slot')).map(s => ({
+                groups: s.querySelector('.g').value.split(','),
+                message: s.querySelector('.m').value
+            }));
+            const body = { targets, delay_min: document.getElementById('min').value, delay_max: document.getElementById('max').value };
+            await fetch(proxy + encodeURIComponent(url + "/start"), { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
+            check();
+        }
+        async function stop() { await fetch(proxy + encodeURIComponent(document.getElementById('url').value + "/stop")); check(); }
+        async function check() {
+            const url = document.getElementById('url').value;
+            try {
+                const res = await fetch(proxy + encodeURIComponent(url + "/status"));
+                const data = await res.json();
+                const st = document.getElementById('stText');
+                st.innerText = data.running ? "RUNNING_STABLE" : "OFFLINE";
+                st.className = data.running ? "online-text" : "offline-text";
+                if (document.querySelectorAll('.slot').length === 0 && data.savedData.targets.length > 0) {
+                    document.getElementById('min').value = data.savedData.delay_min;
+                    document.getElementById('max').value = data.savedData.delay_max;
+                    data.savedData.targets.forEach(t => addSlot(t));
+                }
+            } catch (e) {}
+        }
+        setInterval(check, 5000); window.onload = check;
+    </script>
+</body>
+</html>
